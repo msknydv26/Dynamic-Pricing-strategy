@@ -46,7 +46,7 @@ input_dict = {
     'weather_score': weather_score
 }
 
-# One-hot encoding categorical features
+# One-hot encode categorical features
 for col in features:
     if col.startswith("location_"):
         input_dict[col] = 1 if col == f"location_{location}" else 0
@@ -59,11 +59,10 @@ for col in features:
     elif col.startswith("event_"):
         input_dict[col] = 1 if col == f"event_{event}" else 0
     elif col not in input_dict:
-        input_dict[col] = 0  # default for missing one-hot
+        input_dict[col] = 0  # fallback for unknown features
 
 input_df = pd.DataFrame([input_dict])
 
-# Optional: Show inputs
 with st.expander("📄 See Prediction Input Data"):
     st.dataframe(input_df)
 
@@ -75,3 +74,7 @@ if st.button("🔮 Predict Final Price"):
     except Exception as e:
         st.error("⚠️ Prediction failed.")
         st.code(traceback.format_exc())
+
+
+   
+ 
