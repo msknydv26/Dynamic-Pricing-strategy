@@ -1,70 +1,69 @@
 import streamlit as st
 import pandas as pd
-import traceback
+import numpy as np
 import pickle
+import requests
+import io
 
-# --- Page Config ---
-st.set_page_config(page_title="Dynamic Pricing Predictor", page_icon="💸", layout="centered")
+# --- App Setup ---
+st.set_page_config(page_title="PWAVE - Dynamic Pricing Predictor", page_icon="💸", layout="centered")
+st.title("💸 PWAVE: Dynamic Pricing Strategy Predictor")
+st.markdown("Predict optimal prices dynamically using your trained ML model and interactive inputs.")
 
-# --- Title & Description ---
-st.title("💸 Dynamic Pricing Strategy Predictor")
-st.markdown("Use your custom-trained model to predict the **final optimal price** based on the input data.")
-
-# --- File Uploader ---
-uploaded_model = st.file_uploader("📦 Upload your trained model (.pkl)", type=["pkl"])
-uploaded_csv = st.file_uploader("📄 Upload input data (.csv)", type=["csv"])
-
-# --- Load Model ---
-def load_model(file):
+# --- Load features.pkl from local repo ---
+@st.cache_data
+def load_local_features():
     try:
-        model = pickle.load(file)
-        return model
+        with open("features.pkl", "rb") as f:
+            return pickle.load(f)
     except Exception as e:
-        st.error(f"❌ Failed to load model: {e}")
-        st.text(traceback.format_exc())
+        st.error(f"❌ Failed to load features.pkl: {e}")
         return None
 
-# --- Make Predictions ---
-def make_prediction(model, df):
+# --- Load model.pkl from Google Drive ---
+@st.cache_resource
+def load_model_from_drive():
     try:
-        prediction = model.predict(df)
-        return prediction
+        file_id = "1G3RA7pDFouY8Ob7hpFmEH3dZ8AQDtP0u"  # Your file ID
+        download_url = f"https://drive.google.com/uc?id={file_id}"
+        response = requests.get(download_url)
+        response.raise_for_status()
+        return pickle.load(io.BytesIO(response.content))
     except Exception as e:
-        st.error("❌ Prediction failed. Check if the input features match the model training data.")
-        st.text(traceback.format_exc())
+        st.error(f"❌ Error loading model from Google Drive: {e}")
         return None
+
+# --- Load files ---
+features = load_local_features()
+model = load_model_from_drive()
 
 # --- Main App Logic ---
-if uploaded_model and uploaded_csv:
-    model = load_model(uploaded_model)
+if model and features:
+    st.success("✅ Model and feature schema loaded successfully.")
+    st.subheader("🎛️ Input Parameters")
 
-    if model:
+    input_data = {}
+    for feature, options in features.items():
+        if isinstance(options, list):
+            input_data[feature] = st.selectbox(f"{feature}:", options)
+        elif isinstance(options, tuple) and len(options) == 2:
+            min_val, max_val = options
+            input_data[feature] = st.slider(f"{feature}:", min_val, max_val, value=(min_val + max_val) // 2)
+        else:
+            input_data[feature] = st.text_input(f"{feature}:")
+
+    # Prediction
+    if st.button("🚀 Predict"):
         try:
-            df = pd.read_csv(uploaded_csv)
-            st.subheader("📊 Input Data Preview")
-            st.dataframe(df.head())
-
-            if st.button("🚀 Predict Optimal Prices"):
-                with st.spinner("Predicting..."):
-                    prediction = make_prediction(model, df)
-
-                    if prediction is not None:
-                        st.success("✅ Prediction Successful!")
-                        df["Predicted Price"] = prediction
-                        st.subheader("📈 Results")
-                        st.dataframe(df)
-
-                        # Download result
-                        csv = df.to_csv(index=False).encode('utf-8')
-                        st.download_button("⬇️ Download Results", data=csv, file_name="predicted_prices.csv", mime="text/csv")
-
+            input_df = pd.DataFrame([input_data])
+            prediction = model.predict(input_df)[0]
+            st.success(f"💰 Predicted Optimal Price: ₹ {round(prediction, 2)}")
         except Exception as e:
-            st.error("❌ Failed to process input CSV.")
-            st.text(traceback.format_exc())
-
-elif not uploaded_model or not uploaded_csv:
-    st.info("⬆️ Please upload both the model and input data to proceed.")
+            st.error("❌ Prediction failed.")
+            st.text(str(e))
+else:
+    st.warning("⚠️ Please ensure that both the model and features are correctly loaded.")
 
 # --- Footer ---
 st.markdown("---")
-st.caption("Built with ❤️ using Streamlit | © 2025 Dynamic Pricing Predictor")
+st.caption("Built with ❤️ by Team PWAVE | Powered by Streamlit")
