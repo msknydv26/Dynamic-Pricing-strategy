@@ -74,7 +74,3 @@ if st.button("🔮 Predict Final Price"):
     except Exception as e:
         st.error("⚠️ Prediction failed.")
         st.code(traceback.format_exc())
-
-
-   
- 
